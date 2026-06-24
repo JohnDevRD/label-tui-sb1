@@ -40,7 +40,7 @@ func LoadTemplate(name string) (string, error) {
 
 var replacers = map[string]func(Article, int) string{
 	"CODE": func(a Article, _ int) string {
-		return a.Code
+		return a.ItemCode
 	},
 	"DESCRIPTION": func(a Article, _ int) string {
 		return a.Description

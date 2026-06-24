@@ -53,7 +53,7 @@ func New() Model {
 	}
 
 	if settings.SAPServiceLayerURL != "" {
-		m.sapClient = core.NewSapClient(settings.SAPServiceLayerURL)
+		m.sapClient = core.NewSapClient(settings.SAPServiceLayerURL, settings.PriceList)
 	}
 
 	return m
@@ -477,7 +477,7 @@ type searchResultsMsg struct {
 
 func (m *Model) doSearch(query string) tea.Cmd {
 	return func() tea.Msg {
-		filter := "contains(Code,'" + query + "') or contains(ItemName,'" + query + "')"
+		filter := "contains(ItemCode,'" + query + "') or contains(ItemName,'" + query + "')"
 		articles, err := m.sapClient.QueryArticles(filter)
 		if err != nil {
 			return searchResultsMsg{err: err.Error()}
@@ -514,7 +514,7 @@ func (m *Model) viewSearch() string {
 		for i, a := range m.search.results {
 			_, checked := m.search.selected[i]
 
-			line := fmt.Sprintf("%-20s %-30s $%8.2f", a.Code, truncate(a.Description, 28), a.Price)
+			line := fmt.Sprintf("%-20s %-30s $%8.2f", a.ItemCode, truncate(a.Description, 28), a.Price)
 			if checked {
 				line += fmt.Sprintf("  x%d ✓", m.search.selected[i])
 				body += ArticleCheckedStyle.Render(line) + "\n"
@@ -684,7 +684,7 @@ func (m *Model) viewPreview() string {
 		s += SectionStyle.Render("Selected Articles") + "\n"
 		for idx, qty := range m.preview.selected {
 			a := m.preview.articles[idx]
-			s += fmt.Sprintf("  %s  %s  x%d  $%.2f\n", a.Code, truncate(a.Description, 30), qty, a.Price)
+			s += fmt.Sprintf("  %s  %s  x%d  $%.2f\n", a.ItemCode, truncate(a.Description, 30), qty, a.Price)
 		}
 		return s
 	}()) + "\n"
@@ -723,7 +723,7 @@ type settingsModel struct {
 }
 
 func newSettingsModel(s *core.Settings) settingsModel {
-	inputs := make([]textinput.Model, 3)
+	inputs := make([]textinput.Model, 4)
 
 	inputs[0] = textinput.New()
 	inputs[0].Placeholder = "SBODemoCL"
@@ -745,6 +745,13 @@ func newSettingsModel(s *core.Settings) settingsModel {
 	inputs[2].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorPrimary))
 	if s.USBPort != "" {
 		inputs[2].SetValue(s.USBPort)
+	}
+
+	inputs[3] = textinput.New()
+	inputs[3].Placeholder = "1"
+	inputs[3].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorPrimary))
+	if s.PriceList > 0 {
+		inputs[3].SetValue(fmt.Sprintf("%d", s.PriceList))
 	}
 
 	m := settingsModel{inputs: inputs}
@@ -803,9 +810,10 @@ func (m *Model) saveSettings() tea.Cmd {
 		m.settings.CompanyDB = m.settingsScr.inputs[0].Value()
 		m.settings.SAPServiceLayerURL = m.settingsScr.inputs[1].Value()
 		m.settings.USBPort = m.settingsScr.inputs[2].Value()
+		fmt.Sscanf(m.settingsScr.inputs[3].Value(), "%d", &m.settings.PriceList)
 
 		if m.settings.SAPServiceLayerURL != "" {
-			m.sapClient = core.NewSapClient(m.settings.SAPServiceLayerURL)
+			m.sapClient = core.NewSapClient(m.settings.SAPServiceLayerURL, m.settings.PriceList)
 		}
 
 		if err := core.SaveSettings(m.settings); err != nil {
@@ -823,7 +831,7 @@ type settingsSavedMsg struct {
 func (m *Model) viewSettings() string {
 	body := SectionStyle.Render("Configuration") + "\n\n"
 
-	labels := []string{"CompanyDB", "SAP Service Layer URL", "USB Printer Port"}
+	labels := []string{"CompanyDB", "SAP Service Layer URL", "USB Printer Port", "Price List (number)"}
 	for i, input := range m.settingsScr.inputs {
 		body += DimmedStyle.Render(labels[i]) + "\n"
 		style := InputStyle

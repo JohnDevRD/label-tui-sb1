@@ -38,3 +38,6 @@ settings.json
 .opencode/
 .atl/
 
+# Notes / fixes
+.fix/
+

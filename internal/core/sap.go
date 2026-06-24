@@ -19,13 +19,15 @@ type loginRequest struct {
 type SapClient struct {
 	BaseURL   string
 	SessionID string
+	PriceList int
 	client    *http.Client
 }
 
-func NewSapClient(baseURL string) *SapClient {
+func NewSapClient(baseURL string, priceList int) *SapClient {
 	return &SapClient{
-		BaseURL: strings.TrimRight(baseURL, "/"),
-		client:  &http.Client{},
+		BaseURL:   strings.TrimRight(baseURL, "/"),
+		PriceList: priceList,
+		client:    &http.Client{},
 	}
 }
 
@@ -68,7 +70,7 @@ type SapItemsResponse struct {
 }
 
 func (s *SapClient) QueryArticles(filter string) ([]Article, error) {
-	u := s.BaseURL + "/Items?$select=Code,ItemName,BarCode,UnitPrice"
+	u := s.BaseURL + "/Items?$select=ItemCode,ItemName,BarCode&$expand=ItemPrices"
 	if filter != "" {
 		u += "&$filter=" + url.QueryEscape(filter)
 	}
@@ -95,5 +97,18 @@ func (s *SapClient) QueryArticles(filter string) ([]Article, error) {
 		return nil, fmt.Errorf("decode items response: %w", err)
 	}
 
+	for i := range result.Value {
+		result.Value[i].Price = result.Value[i].priceForList(s.PriceList)
+	}
+
 	return result.Value, nil
+}
+
+func (a Article) priceForList(listNum int) float64 {
+	for _, p := range a.ItemPrices {
+		if p.PriceList == listNum {
+			return p.Price
+		}
+	}
+	return 0
 }
