@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -477,7 +478,9 @@ type searchResultsMsg struct {
 
 func (m *Model) doSearch(query string) tea.Cmd {
 	return func() tea.Msg {
-		filter := "contains(ItemCode,'" + query + "') or contains(ItemName,'" + query + "')"
+		q := strings.ReplaceAll(query, "'", "''")
+		qUpper := strings.ToUpper(q)
+		filter := fmt.Sprintf("contains(toupper(ItemCode),'%s') or contains(toupper(ItemName),'%s') or contains(toupper(BarCode),'%s')", qUpper, qUpper, qUpper)
 		articles, err := m.sapClient.QueryArticles(filter)
 		if err != nil {
 			return searchResultsMsg{err: err.Error()}
