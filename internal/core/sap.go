@@ -70,7 +70,7 @@ type SapItemsResponse struct {
 }
 
 func (s *SapClient) QueryArticles(filter string) ([]Article, error) {
-	u := s.BaseURL + "/Items?$select=ItemCode,ItemName,BarCode&$expand=ItemPrices"
+	u := s.BaseURL + "/Items?$select=ItemCode,ItemName,BarCode"
 	if filter != "" {
 		u += "&$filter=" + url.QueryEscape(filter)
 	}
