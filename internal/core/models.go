@@ -14,6 +14,7 @@ type PrintJob struct {
 }
 
 type Settings struct {
+	CompanyDB          string `json:"company_db"`
 	SAPServiceLayerURL string `json:"sap_service_layer_url"`
 	USBPort            string `json:"usb_port"`
 	DefaultTemplate    string `json:"default_template"`

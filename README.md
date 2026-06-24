@@ -43,6 +43,7 @@ Configuración persistente (se crea tras el primer uso):
 ```json
 ~/.label-tui/settings.json
 {
+  "company_db": "SBODemoCL",
   "sap_service_layer_url": "http://your-server:50000/b1s/v1",
   "usb_port": "/dev/ttyUSB0",
   "default_template": "etiqueta.zpl"

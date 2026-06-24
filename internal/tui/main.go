@@ -243,21 +243,17 @@ type loginModel struct {
 }
 
 func newLoginModel() loginModel {
-	inputs := make([]textinput.Model, 3)
+	inputs := make([]textinput.Model, 2)
 
 	inputs[0] = textinput.New()
-	inputs[0].Placeholder = "CompanyDB"
+	inputs[0].Placeholder = "Username"
 	inputs[0].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorPrimary))
 	inputs[0].Focus()
 
 	inputs[1] = textinput.New()
-	inputs[1].Placeholder = "Username"
+	inputs[1].Placeholder = "Password"
 	inputs[1].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorPrimary))
-
-	inputs[2] = textinput.New()
-	inputs[2].Placeholder = "Password"
-	inputs[2].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorPrimary))
-	inputs[2].EchoMode = textinput.EchoPassword
+	inputs[1].EchoMode = textinput.EchoPassword
 
 	return loginModel{inputs: inputs}
 }
@@ -307,19 +303,22 @@ func (m *Model) updateLoginInputs(msg tea.Msg) tea.Cmd {
 
 func (m *Model) doLogin() tea.Cmd {
 	return func() tea.Msg {
-		companyDB := m.login.inputs[0].Value()
-		user := m.login.inputs[1].Value()
-		password := m.login.inputs[2].Value()
+		user := m.login.inputs[0].Value()
+		password := m.login.inputs[1].Value()
 
-		if companyDB == "" || user == "" || password == "" {
-			return loginResultMsg{err: "All fields are required"}
+		if user == "" || password == "" {
+			return loginResultMsg{err: "Username and password are required"}
+		}
+
+		if m.settings.CompanyDB == "" {
+			return loginResultMsg{err: "CompanyDB not configured. Go to Settings first."}
 		}
 
 		if m.sapClient == nil {
 			return loginResultMsg{err: "SAP Service Layer URL not configured. Go to Settings first."}
 		}
 
-		if err := m.sapClient.Login(companyDB, user, password); err != nil {
+		if err := m.sapClient.Login(m.settings.CompanyDB, user, password); err != nil {
 			return loginResultMsg{err: err.Error()}
 		}
 
@@ -724,21 +723,28 @@ type settingsModel struct {
 }
 
 func newSettingsModel(s *core.Settings) settingsModel {
-	inputs := make([]textinput.Model, 2)
+	inputs := make([]textinput.Model, 3)
 
 	inputs[0] = textinput.New()
-	inputs[0].Placeholder = "https://your-server:50000/b1s/v1"
+	inputs[0].Placeholder = "SBODemoCL"
 	inputs[0].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorPrimary))
-	if s.SAPServiceLayerURL != "" {
-		inputs[0].SetValue(s.SAPServiceLayerURL)
+	if s.CompanyDB != "" {
+		inputs[0].SetValue(s.CompanyDB)
 	}
 	inputs[0].Focus()
 
 	inputs[1] = textinput.New()
-	inputs[1].Placeholder = "/dev/usb/lp0  or  COM3"
+	inputs[1].Placeholder = "https://your-server:50000/b1s/v1"
 	inputs[1].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorPrimary))
+	if s.SAPServiceLayerURL != "" {
+		inputs[1].SetValue(s.SAPServiceLayerURL)
+	}
+
+	inputs[2] = textinput.New()
+	inputs[2].Placeholder = "/dev/usb/lp0  or  COM3"
+	inputs[2].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorPrimary))
 	if s.USBPort != "" {
-		inputs[1].SetValue(s.USBPort)
+		inputs[2].SetValue(s.USBPort)
 	}
 
 	m := settingsModel{inputs: inputs}
@@ -794,8 +800,9 @@ func (m *Model) updateSettingsInputs(msg tea.Msg) tea.Cmd {
 
 func (m *Model) saveSettings() tea.Cmd {
 	return func() tea.Msg {
-		m.settings.SAPServiceLayerURL = m.settingsScr.inputs[0].Value()
-		m.settings.USBPort = m.settingsScr.inputs[1].Value()
+		m.settings.CompanyDB = m.settingsScr.inputs[0].Value()
+		m.settings.SAPServiceLayerURL = m.settingsScr.inputs[1].Value()
+		m.settings.USBPort = m.settingsScr.inputs[2].Value()
 
 		if m.settings.SAPServiceLayerURL != "" {
 			m.sapClient = core.NewSapClient(m.settings.SAPServiceLayerURL)
@@ -816,7 +823,7 @@ type settingsSavedMsg struct {
 func (m *Model) viewSettings() string {
 	body := SectionStyle.Render("Configuration") + "\n\n"
 
-	labels := []string{"SAP Service Layer URL", "USB Printer Port"}
+	labels := []string{"CompanyDB", "SAP Service Layer URL", "USB Printer Port"}
 	for i, input := range m.settingsScr.inputs {
 		body += DimmedStyle.Render(labels[i]) + "\n"
 		style := InputStyle
