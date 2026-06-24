@@ -1,0 +1,40 @@
+# Binaries
+label-tui
+label-tui-sb1
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Build output
+/dist/
+/build/
+/tmp/
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Screenshots / assets not part of source
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+
+# Local user config
+settings.json
+
+# Tooling / CI
+.opencode/
+.atl/
+
