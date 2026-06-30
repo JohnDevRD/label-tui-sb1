@@ -40,4 +40,5 @@ settings.json
 
 # Notes / fixes
 .fix/
+.codegraph/
 

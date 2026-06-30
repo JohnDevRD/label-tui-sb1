@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -82,6 +83,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case loginResultMsg:
+		m.login.loading = false
 		if msg.success {
 			m.current = screenSearch
 			m.search = newSearchModel()
@@ -241,6 +243,7 @@ type loginModel struct {
 	focused int
 	err     string
 	loading bool
+	spinner spinner.Model
 }
 
 func newLoginModel() loginModel {
@@ -256,12 +259,22 @@ func newLoginModel() loginModel {
 	inputs[1].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorPrimary))
 	inputs[1].EchoMode = textinput.EchoPassword
 
-	return loginModel{inputs: inputs}
+	s := spinner.New(
+		spinner.WithSpinner(spinner.Dot),
+		spinner.WithStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(colorAccent))),
+	)
+
+	return loginModel{
+		inputs:  inputs,
+		spinner: s,
+	}
 }
 
 func (m *Model) updateLogin(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.login.loading {
-		return m, nil
+		var cmd tea.Cmd
+		m.login.spinner, cmd = m.login.spinner.Update(msg)
+		return m, cmd
 	}
 
 	switch msg := msg.(type) {
@@ -274,7 +287,12 @@ func (m *Model) updateLogin(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.login.focused = (m.login.focused - 1 + len(m.login.inputs)) % len(m.login.inputs)
 			return m, m.focusLoginInput()
 		case "enter":
-			return m, m.doLogin()
+			m.login.loading = true
+			m.login.err = ""
+			for i := range m.login.inputs {
+				m.login.inputs[i].Blur()
+			}
+			return m, tea.Batch(m.login.spinner.Tick, m.doLogin())
 		}
 	}
 
@@ -346,7 +364,10 @@ func (m *Model) viewLogin() string {
 
 	var status string
 	if m.login.loading {
-		status = SpinnerStyle.Render("Logging in to SAP B1...")
+		status = lipgloss.JoinHorizontal(lipgloss.Center,
+			m.login.spinner.View(),
+			SpinnerStyle.Render(" Logging in to SAP B1..."),
+		)
 	} else if m.login.err != "" {
 		status = ErrorStyle.Render("Error: " + m.login.err)
 	}
