@@ -110,7 +110,32 @@ func (s *SapClient) QueryArticles(filter string) ([]Article, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("items query failed (status %d): %s", resp.StatusCode, string(raw))
+
+		// Intentar extraer mensaje legible del JSON de error de SAP
+		var sapErr struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		msg := string(raw)
+		// Intentar formato {"error":{"message":"..."}}
+		if json.Unmarshal(raw, &sapErr) == nil && sapErr.Error.Message != "" {
+			msg = sapErr.Error.Message
+		} else {
+			// Intentar formato {"error":{"message":{"value":"..."}}}
+			var sapErr2 struct {
+				Error struct {
+					Message struct {
+						Value string `json:"value"`
+					} `json:"message"`
+				} `json:"error"`
+			}
+			if json.Unmarshal(raw, &sapErr2) == nil && sapErr2.Error.Message.Value != "" {
+				msg = sapErr2.Error.Message.Value
+			}
+		}
+
+		return nil, fmt.Errorf("%s", msg)
 	}
 
 	var result SapItemsResponse

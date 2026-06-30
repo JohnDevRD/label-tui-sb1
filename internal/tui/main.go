@@ -25,6 +25,7 @@ const (
 
 type Model struct {
 	current     screen
+	prevScreen  screen
 	sapClient   *core.SapClient
 	settings    *core.Settings
 	articles    []core.Article
@@ -107,7 +108,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.current == screenWelcome {
 				return m, tea.Quit
 			}
-			m.current = screenWelcome
+			if m.current == screenSettings {
+				m.current = m.prevScreen
+			} else {
+				m.current = screenWelcome
+			}
+			return m, nil
+
+		case "ctrl+s":
+			if m.current != screenSettings {
+				m.prevScreen = m.current
+			}
+			m.settingsScr = newSettingsModel(m.settings)
+			m.current = screenSettings
 			return m, nil
 		}
 	}
@@ -392,6 +405,7 @@ type searchModel struct {
 	loading       bool
 	qty           int
 	selected      map[int]int
+	spinner       spinner.Model
 }
 
 func newSearchModel() searchModel {
@@ -400,33 +414,52 @@ func newSearchModel() searchModel {
 	ti.Prompt = "🔍 "
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorAccent))
 	ti.Focus()
+
+	s := spinner.New(
+		spinner.WithSpinner(spinner.Dot),
+		spinner.WithStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(colorAccent))),
+	)
+
 	return searchModel{
 		input:    ti,
 		selected: make(map[int]int),
 		qty:      1,
+		spinner:  s,
 	}
 }
 
 func (m *Model) updateSearch(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m.search.loading {
-		return m, nil
-	}
-
+	// Manejar resultados incluso cuando está cargando
 	switch msg := msg.(type) {
 	case searchResultsMsg:
 		m.search.results = msg.results
 		m.search.err = msg.err
 		m.search.loading = false
 		m.search.cursor = 0
-		return m, nil
+		// Auto-enfocar el input y limpiar para escribir un nuevo término
+		m.search.input.Focus()
+		m.search.input.SetValue("")
+		cmds := []tea.Cmd{textinput.Blink}
+		return m, tea.Batch(cmds...)
+	}
 
+	if m.search.loading {
+		var cmd tea.Cmd
+		m.search.spinner, cmd = m.search.spinner.Update(msg)
+		return m, cmd
+	}
+
+	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
 			if m.search.input.Focused() {
 				query := m.search.input.Value()
 				if query != "" {
-					return m, m.doSearch(query)
+					m.search.err = ""
+					m.search.loading = true
+					m.search.input.Blur()
+					return m, tea.Batch(m.search.spinner.Tick, m.doSearch(query))
 				}
 			}
 			return m, nil
@@ -522,7 +555,10 @@ func (m *Model) viewSearch() string {
 	body += searchInput.Render(m.search.input.View()) + "\n"
 
 	if m.search.loading {
-		body += "\n" + SpinnerStyle.Render("Searching SAP B1...") + "\n"
+		body += "\n" + lipgloss.JoinHorizontal(lipgloss.Center,
+			m.search.spinner.View(),
+			SpinnerStyle.Render(" Searching SAP B1..."),
+		) + "\n"
 		return body
 	}
 
@@ -559,6 +595,7 @@ func (m *Model) viewSearch() string {
 		"← deselect",
 		"+/- qty",
 		"p print",
+		"ctrl+s settings",
 	)
 
 	return body
@@ -758,7 +795,7 @@ func newSettingsModel(s *core.Settings) settingsModel {
 	inputs[0].Focus()
 
 	inputs[1] = textinput.New()
-	inputs[1].Placeholder = "https://your-server:50000/b1s/v1"
+	inputs[1].Placeholder = "https://your-server:50000/b1s/v2"
 	inputs[1].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorPrimary))
 	if s.SAPServiceLayerURL != "" {
 		inputs[1].SetValue(s.SAPServiceLayerURL)
