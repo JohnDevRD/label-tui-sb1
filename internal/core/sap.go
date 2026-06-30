@@ -52,7 +52,28 @@ func (s *SapClient) Login(companyDB, user, password string) error {
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		raw, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("login failed (status %d): %s", resp.StatusCode, string(raw))
+
+		// Intentar extraer mensaje legible del JSON de error de SAP
+		var sapErr struct {
+			Error struct {
+				Message struct {
+					Value string `json:"value"`
+				} `json:"message"`
+			} `json:"error"`
+		}
+		msg := string(raw)
+		if json.Unmarshal(raw, &sapErr) == nil && sapErr.Error.Message.Value != "" {
+			msg = sapErr.Error.Message.Value
+		}
+
+		switch resp.StatusCode {
+		case http.StatusUnauthorized:
+			return fmt.Errorf("Invalid username or password")
+		case http.StatusServiceUnavailable, http.StatusBadGateway, http.StatusGatewayTimeout:
+			return fmt.Errorf("SAP service unavailable: %s", msg)
+		default:
+			return fmt.Errorf("Login failed: %s", msg)
+		}
 	}
 
 	for _, c := range resp.Cookies() {
